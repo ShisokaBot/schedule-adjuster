@@ -13,9 +13,23 @@ def get_now_jp():
 
 st.title("2026年3月末〜5月末 スケジュール回答")
 
-# --- 奏者リスト ---
-RAW_MEMBERS = ["三國浩平", "宇佐見優", "岩崎花保", "小野江良太", "近藤圭", "志村樺奈", "篠嶋祐希", "竹之下滉", "長谷川太郎", "西宥介", "西部圭亮", "布施砂丘彦", "前田優紀"]
-MEMBERS = sorted(list(set(RAW_MEMBERS)))
+# --- 奏者リストをスプレッドシートから動的に読み込む ---
+try:
+    # 「関係者リスト」シートを読み込み
+    df_rel = conn.read(worksheet="関係者リスト", ttl=0)
+    
+    # A列（0番目の列）の2行目以降（インデックス0から）を取得し、空行を除去してリスト化
+    raw_list = df_rel.iloc[:, 0].dropna().astype(str).tolist()
+    
+    # 重複を除去してソート
+    MEMBERS = sorted(list(set([m for m in raw_list if m.strip() != ""])))
+
+except Exception as e:
+    # 万が一読み込みに失敗した時のための予備（バックアップ）
+    st.error(f"奏者リストの読み込みに失敗しました。予備リストを使用します。: {e}")
+    RAW_MEMBERS = ["三國浩平", "宇佐見優", "岩崎花保", "小野江良太", "近藤圭", "志村樺奈", "篠嶋祐希", "竹之下滉", "長谷川太郎", "西宥介", "西部圭亮", "布施砂丘彦", "前田優紀"]
+    MEMBERS = sorted(list(set(RAW_MEMBERS)))
+    
 OPTIONS = ["選択してください"] + MEMBERS + ["直接入力する..."]
 
 # --- 日付リスト作成 ---
