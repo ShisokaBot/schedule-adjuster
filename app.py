@@ -34,10 +34,10 @@ if user_name != "選択してください":
         st.session_state.df_input = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
         st.session_state.current_user = user_name
 
-    
     # 説明文（改行・太字・アンダーバー）
-    st.markdown("#### **下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。**", unsafe_allow_html=True)
-    st.markdown("#### **入力を終えたら、送信ボタンを押してください。**")
+    st.subheader(f"{user_name} さんの入力画面")
+    st.markdown("下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。", unsafe_allow_html=True)
+    st.markdown("入力を終えたら、送信ボタンを押してください。")
     
     # 編集可能な表（チェックボックス形式）
     edited_df = st.data_editor(
@@ -64,7 +64,7 @@ if user_name != "選択してください":
                     })
         
         try:
-            sheetNM = "奏者予定表"
+            sheetNM = "予定表"
             existing_data = conn.read(worksheet=sheetNM)
             new_df = pd.DataFrame(new_rows)
             
