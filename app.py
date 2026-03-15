@@ -54,14 +54,23 @@ if user_name != "選択してください":
         st.session_state.df_input = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
         st.session_state.current_user = user_name
 
-    # 編集可能な表（Checkbox形式でワンタッチ入力）
+    # 編集可能な表（Selectbox形式で❌を選びやすくする）
     edited_df = st.data_editor(
         st.session_state.df_input,
         use_container_width=True,
         column_config={
-            "午前": st.column_config.CheckboxColumn(default=False),
-            "午後": st.column_config.CheckboxColumn(default=False),
-            "夜間": st.column_config.CheckboxColumn(default=False),
+            "午前": st.column_config.SelectboxColumn(
+                options=["", "❌"],
+                width="small"
+            ),
+            "午後": st.column_config.SelectboxColumn(
+                options=["", "❌"],
+                width="small"
+            ),
+            "夜間": st.column_config.SelectboxColumn(
+                options=["", "❌"],
+                width="small"
+            ),
         }
     )
 
