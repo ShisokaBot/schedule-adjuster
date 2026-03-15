@@ -9,6 +9,10 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 st.title("2026年3月〜5月 スケジュール回答")
 
+# 説明文
+st.markdown("#### **下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。**", unsafe_allow_html=True)
+st.markdown("#### **入力を終えたら、送信ボタンを押してください。**")
+
 # --- 奏者リスト ---
 RAW_MEMBERS = ["伊藤友馬", "宇佐見優", "岩崎花保", "小野江良太", "近藤圭", "志村樺奈", "篠嶋祐希", "竹之下滉", "長谷川太郎", "西宥介", "西部圭亮", "舟久保優貴", "布施砂丘彦", "前田優紀"]
 MEMBERS = sorted(list(set(RAW_MEMBERS)))
@@ -29,27 +33,18 @@ date_map = dict(zip(date_labels, date_objects))
 user_name = st.selectbox("あなたの名前を選択してください", ["選択してください"] + MEMBERS)
 
 if user_name != "選択してください":
-    # 名前が変わった瞬間にデータを読み込むロジック
     if 'current_user' not in st.session_state or st.session_state.current_user != user_name:
         st.session_state.current_user = user_name
         
-        # 1. スプレッドシートから最新データを読み込む
         try:
-            sheetNM = "収集用シート"
+            sheetNM = "奏者予定表"
             df_existing = conn.read(worksheet=sheetNM)
-            
-            # 初期状態（すべてFalse）のデータフレーム作成
             new_input_df = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
             
             if not df_existing.empty and "name" in df_existing.columns:
-                # 選択したユーザーのデータだけ抽出
                 user_data = df_existing[df_existing["name"] == user_name]
-                
-                # 既存の❌をチェックボックスに反映
                 for _, row in user_data.iterrows():
-                    # スプレッドシートの日付（date型または文字列）をラベル形式に変換して照合
                     d_obj = pd.to_datetime(row['date']).date()
-                    # 逆引きしてラベルを取得
                     matching_labels = [l for l, d in date_map.items() if d == d_obj]
                     if matching_labels:
                         label = matching_labels[0]
@@ -58,17 +53,9 @@ if user_name != "選択してください":
             
             st.session_state.df_input = new_input_df
             st.toast(f"{user_name} さんの前回の回答を読み込みました")
-            
-        except Exception as e:
-            # 初回などデータがない場合は空の表を表示
+        except Exception:
             st.session_state.df_input = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
 
-    
-    # 説明文（改行・太字・アンダーバー）
-    st.subheader(f"{user_name} さんの入力画面")
-    st.markdown("下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。", unsafe_allow_html=True)
-    st.markdown("入力を終えたら、送信ボタンを押してください。")
-    
     # 編集可能な表
     edited_df = st.data_editor(
         st.session_state.df_input,
@@ -81,8 +68,11 @@ if user_name != "選択してください":
         }
     )
 
-    # 送信ボタン
+    # --- 送信ボタン（タイムスタンプ追加版） ---
     if st.button("この内容で送信する"):
+        # 送信時の日時を取得
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         new_rows = []
         for label, row in edited_df.iterrows():
             for slot in ["午前", "午後", "夜間"]:
@@ -91,15 +81,16 @@ if user_name != "選択してください":
                         "name": user_name,
                         "date": date_map[label],
                         "slot": slot,
-                        "status": "❌"
+                        "status": "❌",
+                        "submitted_at": timestamp  # ここで日時を追加
                     })
         
         try:
-            sheetNM = "収集用シート"
+            sheetNM = "奏者予定表"
             existing_all = conn.read(worksheet=sheetNM)
             new_df = pd.DataFrame(new_rows)
             
-            # 上書きロジック：自分以外のデータ ＋ 今回の新しいデータ
+            # 上書きロジック（古い「submitted_at」を含む自分のデータを消して、新しいセットを入れる）
             if not existing_all.empty and "name" in existing_all.columns:
                 other_users_data = existing_all[existing_all["name"] != user_name]
                 updated_df = pd.concat([other_users_data, new_df], ignore_index=True)
@@ -107,9 +98,8 @@ if user_name != "選択してください":
                 updated_df = new_df
             
             conn.update(worksheet=sheetNM, data=updated_df)
-            st.success("最新の回答として保存しました！")
+            st.success(f"最新の回答を送信しました！ ({timestamp})")
             st.balloons()
-            # 状態を更新
             st.session_state.df_input = edited_df
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")
