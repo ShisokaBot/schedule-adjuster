@@ -1,11 +1,17 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
+import pytz  # 日本時間設定用
 from streamlit_gsheets import GSheetsConnection
 
 # ページ設定
 st.set_page_config(page_title="スケジュール調整", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
+
+# 日本時間の取得関数
+def get_now_jp():
+    tokyo_tz = pytz.timezone('Asia/Tokyo')
+    return datetime.now(tokyo_tz).strftime("%Y-%m-%d %H:%M:%S")
 
 st.title("2026年3月末〜5月末 スケジュール回答")
 
@@ -29,37 +35,44 @@ date_map = dict(zip(date_labels, date_objects))
 user_name = st.selectbox("あなたの名前を選択してください", ["選択してください"] + MEMBERS)
 
 if user_name != "選択してください":
+    # ユーザーが切り替わった時の処理
     if 'current_user' not in st.session_state or st.session_state.current_user != user_name:
         st.session_state.current_user = user_name
         
         try:
             sheetNM = "収集用"
-            df_existing = conn.read(worksheet=sheetNM)
+            # ttl=0 を入れることでキャッシュを無視し、必ず最新のシートを読み込む
+            df_existing = conn.read(worksheet=sheetNM, ttl=0)
             new_input_df = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
             
             if not df_existing.empty and "name" in df_existing.columns:
                 user_data = df_existing[df_existing["name"] == user_name]
+                
                 for _, row in user_data.iterrows():
-                    d_obj = pd.to_datetime(row['date']).date()
-                    matching_labels = [l for l, d in date_map.items() if d == d_obj]
-                    if matching_labels:
-                        label = matching_labels[0]
-                        if row['slot'] in new_input_df.columns:
-                            new_input_df.at[label, row['slot']] = True
+                    # 日付の比較（型を確実に合わせる）
+                    target_date = pd.to_datetime(row['date']).date()
+                    # 逆引きしてラベルを取得
+                    for label, d_obj in date_map.items():
+                        if d_obj == target_date:
+                            if row['slot'] in new_input_df.columns:
+                                new_input_df.at[label, row['slot']] = True
+                            break
             
             st.session_state.df_input = new_input_df
             st.toast(f"{user_name} さんの前回の回答を読み込みました")
-        except Exception:
+        except Exception as e:
             st.session_state.df_input = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
+
     # 説明文
     st.subheader(f"{user_name} さんの入力画面")
     st.markdown("下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。", unsafe_allow_html=True)
     st.markdown("入力を終えたら、送信ボタンを押してください。")
 
     # 編集可能な表
+    # keyにuser_nameを含めることで、ユーザー切り替え時に表を強制リセット（再描画）する
     edited_df = st.data_editor(
         st.session_state.df_input,
-        key="data_editor",
+        key=f"data_editor_{user_name}",
         use_container_width=True,
         column_config={
             "午前": st.column_config.CheckboxColumn(default=False),
@@ -68,10 +81,9 @@ if user_name != "選択してください":
         }
     )
 
-    # --- 送信ボタン（タイムスタンプ追加版） ---
+    # --- 送信ボタン ---
     if st.button("この内容で送信する"):
-        # 送信時の日時を取得
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = get_now_jp() # 日本時間を取得
         
         new_rows = []
         for label, row in edited_df.iterrows():
@@ -82,15 +94,15 @@ if user_name != "選択してください":
                         "date": date_map[label],
                         "slot": slot,
                         "status": "❌",
-                        "submitted_at": timestamp  # ここで日時を追加
+                        "submitted_at": timestamp
                     })
         
         try:
             sheetNM = "収集用"
-            existing_all = conn.read(worksheet=sheetNM)
+            # 送信前にも最新を読み込んで他の人のデータを保持する
+            existing_all = conn.read(worksheet=sheetNM, ttl=0)
             new_df = pd.DataFrame(new_rows)
             
-            # 上書きロジック（古い「submitted_at」を含む自分のデータを消して、新しいセットを入れる）
             if not existing_all.empty and "name" in existing_all.columns:
                 other_users_data = existing_all[existing_all["name"] != user_name]
                 updated_df = pd.concat([other_users_data, new_df], ignore_index=True)
@@ -100,6 +112,7 @@ if user_name != "選択してください":
             conn.update(worksheet=sheetNM, data=updated_df)
             st.success(f"最新の回答を送信しました！ ({timestamp})")
             st.balloons()
+            # 送信後の状態をセッションに反映
             st.session_state.df_input = edited_df
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")
