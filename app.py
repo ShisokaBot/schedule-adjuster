@@ -66,7 +66,7 @@ if user_name != "選択してください":
         
         if new_rows:
             try:
-                sheetNM = "奏者予定表"
+                sheetNM = "予定表"
                 existing_data = conn.read(worksheet=sheetNM)
                 new_df = pd.DataFrame(new_rows)
                 
