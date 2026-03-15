@@ -7,10 +7,10 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="スケジュール調整", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-st.title("4月〜5月 スケジュール回答")
+st.title("3月末〜5月末 スケジュール回答")
 
 # メンバーリスト
-MEMBERS = [f"ミュージシャン{i}" for i in range(1, 16)]
+MEMBERS = [f"奏者{i}" for i in range(1, 16)]
 
 # --- 日付リストの作成 ---
 # 曜日を日本語に変換する辞書
@@ -71,4 +71,19 @@ if user_name != "選択してください":
                 new_df = pd.DataFrame(new_rows)
                 
                 # 日付型として比較・結合を行うために型を合わせる（念のため）
-                if not existing_data.empty and "name" in
+                if not existing_data.empty and "name" in existing_data.columns:
+                    existing_data['date'] = pd.to_datetime(existing_data['date']).dt.date
+                    clean_existing = existing_data[existing_data["name"] != user_name]
+                    updated_df = pd.concat([clean_existing, new_df], ignore_index=True)
+                else:
+                    updated_df = new_df
+                
+                # スプレッドシートを更新
+                conn.update(worksheet=sheetNM, data=updated_df)
+                
+                st.success("全ての回答を送信しました！")
+                st.balloons()
+            except Exception as e:
+                st.error(f"送信エラーが発生しました: {e}")
+        else:
+            st.warning("❌が一つも入力されていません。")
