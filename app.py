@@ -79,8 +79,8 @@ if user_name:
 
     # --- 入力画面表示 ---
     st.subheader(f"{user_name} さんの入力画面")
-    st.markdown("#### **下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。**", unsafe_allow_html=True)
-    st.markdown("#### **入力を終えたら、送信ボタンを押してください。**")
+    st.markdown("下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。", unsafe_allow_html=True)
+    st.markdown("入力を終えたら、送信ボタンを押してください。")
 
     edited_df = st.data_editor(
         st.session_state.df_input,
