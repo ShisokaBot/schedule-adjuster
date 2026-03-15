@@ -7,7 +7,7 @@ st.title("4月〜5月 スケジュール回答")
 st.write("※入力した内容は他のメンバーからは見えません。")
 
 # メンバー（適宜書き換えてください）
-MEMBERS = [f"ミュージシャン{i}" for i in range(1, 16)]
+MEMBERS = [f"奏者{i}" for i in range(1, 16)]
 
 # 平日リスト作成
 date_list = []
