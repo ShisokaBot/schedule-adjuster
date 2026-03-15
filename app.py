@@ -16,6 +16,7 @@ st.title("2026年3月末〜5月末 スケジュール回答")
 # --- 奏者リスト ---
 RAW_MEMBERS = ["宇佐見優", "岩崎花保", "小野江良太", "近藤圭", "志村樺奈", "篠嶋祐希", "竹之下滉", "長谷川太郎", "西宥介", "西部圭亮", "布施砂丘彦", "前田優紀","三國浩平"]
 MEMBERS = sorted(list(set(RAW_MEMBERS)))
+OPTIONS = ["選択してください"] + MEMBERS + ["直接入力する..."]
 
 # --- 日付リスト ---
 wd_ja = ["月", "火", "水", "木", "金", "土", "日"]
@@ -28,8 +29,12 @@ while curr <= end_date:
     curr += timedelta(days=1)
 date_map = dict(zip(date_labels, date_objects))
 
-user_name = st.selectbox("あなたの名前を選択してください", ["選択してください"] + MEMBERS)
-
+user_name = ""
+if selected_option == "直接入力する...":
+    user_name = st.text_input("お名前をフルネームで入力してください（例：山田太郎）")
+elif selected_option != "選択してください":
+    user_name = selected_option
+    
 if user_name != "選択してください":
     # 安全装置
     if 'df_input' not in st.session_state:
