@@ -10,7 +10,14 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 st.title("3月末〜5月末 スケジュール回答")
 
 # メンバーリスト
-MEMBERS = [f"奏者{i}" for i in range(1, 16)]
+# --- 奏者リスト（重複を除き、五十音順にソート） ---
+RAW_MEMBERS = [
+    "宇佐見優", "小野江良太", "布施砂丘彦", "岩崎花保", 
+    "志村樺奈", "前田優紀", "篠嶋祐希", "長谷川太郎", 
+    "竹之下滉", "西宥介", "近藤圭", "西部圭亮", 
+    "舟久保優貴", "伊藤友馬"
+]
+MEMBERS = sorted(list(set(RAW_MEMBERS)))
 
 # --- 日付リストの作成 ---
 # 曜日を日本語に変換する辞書
