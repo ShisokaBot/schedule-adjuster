@@ -8,11 +8,7 @@ st.set_page_config(page_title="スケジュール調整", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # タイトル
-st.title("2026年3月〜5月 スケジュール回答")
-
-# 説明文（改行・太字・アンダーバー）
-st.markdown("#### **下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。**", unsafe_allow_html=True)
-st.markdown("#### **入力を終えたら、送信ボタンを押してください。**")
+st.title("2026年3月末〜5月末 スケジュール回答")
 
 # --- 奏者リスト ---
 RAW_MEMBERS = ["伊藤友馬", "宇佐見優", "岩崎花保", "小野江良太", "近藤圭", "志村樺奈", "篠嶋祐希", "竹之下滉", "長谷川太郎", "西宥介", "西部圭亮", "舟久保優貴", "布施砂丘彦", "前田優紀"]
@@ -38,6 +34,11 @@ if user_name != "選択してください":
         st.session_state.df_input = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
         st.session_state.current_user = user_name
 
+    
+    # 説明文（改行・太字・アンダーバー）
+    st.markdown("#### **下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。**", unsafe_allow_html=True)
+    st.markdown("#### **入力を終えたら、送信ボタンを押してください。**")
+    
     # 編集可能な表（チェックボックス形式）
     edited_df = st.data_editor(
         st.session_state.df_input,
