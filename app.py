@@ -9,10 +9,6 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 st.title("2026年3月〜5月 スケジュール回答")
 
-# 説明文
-st.markdown("#### **下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。**", unsafe_allow_html=True)
-st.markdown("#### **入力を終えたら、送信ボタンを押してください。**")
-
 # --- 奏者リスト ---
 RAW_MEMBERS = ["伊藤友馬", "宇佐見優", "岩崎花保", "小野江良太", "近藤圭", "志村樺奈", "篠嶋祐希", "竹之下滉", "長谷川太郎", "西宥介", "西部圭亮", "舟久保優貴", "布施砂丘彦", "前田優紀"]
 MEMBERS = sorted(list(set(RAW_MEMBERS)))
@@ -39,7 +35,7 @@ if user_name != "選択してください":
         
         # 1. スプレッドシートから最新データを読み込む
         try:
-            sheetNM = "奏者予定表"
+            sheetNM = "収集用シート"
             df_existing = conn.read(worksheet=sheetNM)
             
             # 初期状態（すべてFalse）のデータフレーム作成
@@ -67,6 +63,12 @@ if user_name != "選択してください":
             # 初回などデータがない場合は空の表を表示
             st.session_state.df_input = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
 
+    
+    # 説明文（改行・太字・アンダーバー）
+    st.subheader(f"{user_name} さんの入力画面")
+    st.markdown("下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。", unsafe_allow_html=True)
+    st.markdown("入力を終えたら、送信ボタンを押してください。")
+    
     # 編集可能な表
     edited_df = st.data_editor(
         st.session_state.df_input,
@@ -93,7 +95,7 @@ if user_name != "選択してください":
                     })
         
         try:
-            sheetNM = "奏者予定表"
+            sheetNM = "収集用シート"
             existing_all = conn.read(worksheet=sheetNM)
             new_df = pd.DataFrame(new_rows)
             
