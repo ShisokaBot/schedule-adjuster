@@ -86,7 +86,9 @@ if user_name:
             st.session_state.df_input = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
 
     st.subheader(f"{user_name} さんの入力画面")
-    st.info("空いていない（❌になる）時間帯にチェックを入れてください。")
+    # 説明文
+    st.markdown("下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。", unsafe_allow_html=True)
+    st.markdown("入力を終えたら、送信ボタンを押してください。")
 
     # data_editor の変更は session_state で管理
     edited_df = st.data_editor(
