@@ -7,30 +7,19 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="スケジュール調整", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# --- 1. キャッシュ関数を定義 (これが重要！) ---
+@st.cache_data(ttl=300)  # 5分間はGoogleに読みに行かず、手元のメモリデータを使う
+def fetch_existing_data(sheet_name):
+    return conn.read(worksheet=sheet_name, ttl=300)
+
 def get_now_jp():
     tokyo_tz = pytz.timezone('Asia/Tokyo')
     return datetime.now(tokyo_tz).strftime("%Y-%m-%d %H:%M:%S")
 
 st.title("2026年3月末〜5月末 スケジュール回答")
 
-# --- 奏者リストを固定化（API読み込みを廃止して高速化） ---
-# 重複を排除し、五十音順にソートしたリスト
-MEMBERS = [
-    "岩崎花保",
-    "宇佐見優",
-    "小野江良太",
-    "近藤圭",
-    "篠嶋祐希",
-    "竹之下滉",
-    "西宥介",
-    "西部圭亮",
-    "布施砂丘彦",
-    "前田優紀",
-    "三國浩平",
-    "長谷川太郎"
-]
-
-# 選択肢の作成
+# 奏者リスト（固定化済み）
+MEMBERS = ["岩崎花保", "宇佐見優", "小野江良太", "近藤圭", "篠嶋祐希", "竹之下滉", "西宥介", "西部圭亮", "布施砂丘彦", "前田優紀", "三國浩平", "長谷川太郎"]
 OPTIONS = ["選択してください"] + MEMBERS + ["直接入力する..."]
 
 # --- 日付リスト作成 ---
@@ -44,59 +33,44 @@ while curr <= end_date:
     curr += timedelta(days=1)
 date_map = dict(zip(date_labels, date_objects))
 
-# --- 名前入力セクション ---
+# 名前入力
 selected_option = st.selectbox("あなたの名前を選択してください", OPTIONS)
-
 user_name = ""
 if selected_option == "直接入力する...":
-    user_name = st.text_input("お名前をフルネームで入力してください（例：山田太郎）")
+    user_name = st.text_input("お名前をフルネームで入力してください")
 elif selected_option != "選択してください":
     user_name = selected_option
 
 # --- メイン処理 ---
 if user_name:
-    # 安全装置
-    if 'df_input' not in st.session_state:
-        st.session_state.df_input = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
-
-    # ユーザーが確定したタイミングで読み込み
+    # ユーザーが切り替わったときだけデータを初期化・復元する
     if 'current_user' not in st.session_state or st.session_state.current_user != user_name:
         st.session_state.current_user = user_name
         
         try:
             sheetNM = "収集用"
-            df_existing = conn.read(worksheet=sheetNM, ttl=0)
+            # キャッシュ関数を使用 (チェックのたびにGoogleに飛ばない)
+            df_existing = fetch_existing_data(sheetNM)
             new_input_df = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
             
-            # DlFlgが 1 以外の有効データを検索
             if not df_existing.empty and "name" in df_existing.columns:
-                user_data = df_existing[
-                    (df_existing["name"] == user_name) & 
-                    (df_existing["DlFlg"].astype(str) != "1")
-                ]
-                
+                user_data = df_existing[(df_existing["name"] == user_name) & (df_existing["DlFlg"].astype(str) != "1")]
                 if not user_data.empty:
                     for _, row in user_data.iterrows():
-                        try:
-                            target_date = pd.to_datetime(row['date']).date()
-                            for label, d_obj in date_map.items():
-                                if d_obj == target_date:
-                                    if row['slot'] in new_input_df.columns:
-                                        new_input_df.at[label, row['slot']] = True
-                                    break
-                        except:
-                            continue
+                        target_date = pd.to_datetime(row['date']).date()
+                        for label, d_obj in date_map.items():
+                            if d_obj == target_date:
+                                if row['slot'] in new_input_df.columns:
+                                    new_input_df.at[label, row['slot']] = True
+                                break
                     st.toast(f"{user_name} さんの有効な回答を復元しました 🔄")
-            
             st.session_state.df_input = new_input_df
         except Exception:
             st.session_state.df_input = pd.DataFrame(False, index=date_labels, columns=["午前", "午後", "夜間"])
 
-    # --- 入力画面表示 ---
     st.subheader(f"{user_name} さんの入力画面")
-    st.markdown("下記のうち、<u>**空いていない**</u>時間帯にチェック✅を入れてください。", unsafe_allow_html=True)
-    st.markdown("入力を終えたら、送信ボタンを押してください。")
-
+    
+    # 編集中のデータは session_state で保持し、エディタに渡す
     edited_df = st.data_editor(
         st.session_state.df_input,
         key=f"data_editor_{user_name}",
@@ -107,37 +81,38 @@ if user_name:
             "夜間": st.column_config.CheckboxColumn(default=False),
         }
     )
+    # 大事：チェックを入れるたびに session_state を更新しておく
+    st.session_state.df_input = edited_df
 
     if st.button("この内容で送信する"):
-        timestamp = get_now_jp()
-        new_rows = []
-        for label, row in edited_df.iterrows():
-            for slot in ["午前", "午後", "夜間"]:
-                if row[slot] == True:
-                    new_rows.append({
-                        "name": user_name,
-                        "date": date_map[label],
-                        "slot": slot,
-                        "status": "❌",
-                        "submitted_at": timestamp,
-                        "DlFlg": 0
-                    })
-        
-        try:
-            sheetNM = "収集用"
-            existing_all = conn.read(worksheet=sheetNM, ttl=0)
+        with st.spinner("送信中..."):
+            timestamp = get_now_jp()
+            new_rows = []
+            for label, row in edited_df.iterrows():
+                for slot in ["午前", "午後", "夜間"]:
+                    if row[slot] == True:
+                        new_rows.append({
+                            "name": user_name, "date": date_map[label], "slot": slot,
+                            "status": "❌", "submitted_at": timestamp, "DlFlg": 0
+                        })
             
-            if not existing_all.empty:
-                # 既存の同一名データに論理削除フラグを立てる
-                existing_all.loc[existing_all["name"] == user_name, "DlFlg"] = 1
-                new_df = pd.DataFrame(new_rows)
-                updated_df = pd.concat([existing_all, new_df], ignore_index=True)
-            else:
-                updated_df = pd.DataFrame(new_rows)
-            
-            conn.update(worksheet=sheetNM, data=updated_df)
-            st.success(f"回答を更新しました！ (送信時刻: {timestamp})")
-            st.balloons()
-            st.session_state.df_input = edited_df
-        except Exception as e:
-            st.error(f"エラーが発生しました: {e}")
+            try:
+                sheetNM = "収集用"
+                # 送信時は最新状態が必要なので ttl=0 で読み込む
+                existing_all = conn.read(worksheet=sheetNM, ttl=0)
+                
+                if not existing_all.empty:
+                    existing_all.loc[existing_all["name"] == user_name, "DlFlg"] = 1
+                    updated_df = pd.concat([existing_all, pd.DataFrame(new_rows)], ignore_index=True)
+                else:
+                    updated_df = pd.DataFrame(new_rows)
+                
+                conn.update(worksheet=sheetNM, data=updated_df)
+                
+                # 送信完了後、キャッシュをクリアして次回読み込みに備える
+                st.cache_data.clear()
+                
+                st.success(f"回答を更新しました！ (送信時刻: {timestamp})")
+                st.balloons()
+            except Exception as e:
+                st.error(f"エラーが発生しました: {e}")
